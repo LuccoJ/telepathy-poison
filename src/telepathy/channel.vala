@@ -40,3 +40,14 @@ public interface Telepathy.MessagesChannel : Channel {
 	public abstract HashTable<string, Variant>[,] pending_messages { owned get; }
 	public abstract uint delivery_reporting_support { owned get; }
 }
+
+public enum Telepathy.SocketAddressType { UNIX, ABSTRACT_UNIX, IPV4, IPV6 }
+
+public enum Telepathy.SocketAccessControl { LOCALHOST, PORT, NETMASK, CREDENTIALS }
+
+[DBus (name = "org.freedesktop.Telepathy.Channel.Type.FileTransfer")]
+public interface Telepathy.FileTransferChannel : Channel {
+	public abstract Variant accept_file (uint address_type, uint access_control, Variant access_control_param, uint64 offset) throws IOError;
+	public abstract Variant provide_file (uint address_type, uint access_control, Variant access_control_param) throws IOError;
+	public abstract HashTable<uint, Variant> available_socket_types { owned get; }
+}

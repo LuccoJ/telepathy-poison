@@ -36,9 +36,25 @@ public class Protocol : Object, Telepathy.Protocol {
 				var fixed_properties = new HashTable<string, Variant> (str_hash, str_equal);
 				fixed_properties["org.freedesktop.Telepathy.Channel.ChannelType"] = "org.freedesktop.Telepathy.Channel.Type.Text";
 				fixed_properties["org.freedesktop.Telepathy.Channel.TargetHandleType"] = HandleType.CONTACT;
-				var allowed_properties = new string[] {"org.freedesktop.Telepathy.Channel.TargetHandle", "org.freedesktop.Telepathy.Channel.TargetID"};
+				var allowed_properties = new string[] {
+					"org.freedesktop.Telepathy.Channel.TargetHandle",
+					"org.freedesktop.Telepathy.Channel.TargetID"
+				};
 
-				requestable_channels = { RequestableChannel () { fixed_properties = fixed_properties, allowed_properties = allowed_properties}};
+				requestable_channels += RequestableChannel () { fixed_properties = fixed_properties, allowed_properties = allowed_properties};
+
+				fixed_properties = new HashTable<string, Variant> (str_hash, str_equal);
+				fixed_properties["org.freedesktop.Telepathy.Channel.ChannelType"] = "org.freedesktop.Telepathy.Channel.Type.FileTransfer";
+				fixed_properties["org.freedesktop.Telepathy.Channel.TargetHandleType"] = HandleType.CONTACT;
+				allowed_properties = new string[] {
+					"org.freedesktop.Telepathy.Channel.TargetHandle",
+					"org.freedesktop.Telepathy.Channel.TargetID",
+					"org.freedesktop.Telepathy.Channel.Type.FileTransfer.Filename",
+					"org.freedesktop.Telepathy.Channel.Type.FileTransfer.ContentType",
+					"org.freedesktop.Telepathy.Channel.Type.FileTransfer.Size"
+				};
+
+				requestable_channels += RequestableChannel () { fixed_properties = fixed_properties, allowed_properties = allowed_properties};
 			}
 			return requestable_channels;
 		}

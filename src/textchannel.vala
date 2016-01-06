@@ -73,7 +73,7 @@ public class TextChannel : Object, Telepathy.Channel, Telepathy.TextChannel, Tel
 	}
 
 	public string channel_type { owned get { return "org.freedesktop.Telepathy.Channel.Type.Text"; } }
-	public string[] interfaces { owned get { return {"org.freedesktop.Telepathy.Channel.Interface.Messages"}; } }
+	public string[] interfaces { owned get { return {"org.freedesktop.Telepathy.Channel.Interface.Messages"}; }}
 	uint _target_handle;
 	public uint target_handle { get { return _target_handle; } }
 	string _target_id;

@@ -5,7 +5,7 @@ const string BOOTSTRAP_ADDRESS = "23.226.230.47";
 const uint16 BOOTSTRAP_PORT = 33445;
 const string BOOTSTRAP_KEY = "A09162D68618E742FFBCA1C2C70385E6679604B2D80EA6E84AD0996A1AC8A074";
 
-public class Connection : Object, Telepathy.Connection, Telepathy.ConnectionRequests, Telepathy.ConnectionContacts, Telepathy.ConnectionAliasing, Telepathy.ConnectionContactList, Telepathy.ConnectionSimplePresence {
+public class Connection : Object, Telepathy.Connection, Telepathy.ConnectionRequests, Telepathy.ConnectionContacts, Telepathy.ConnectionAliasing, Telepathy.ConnectionContactList, Telepathy.ConnectionSimplePresence, Telepathy.ContactCapabilities {
 	public string profile { private get; construct; }
 	public ConnectionManager cm { private get; construct; }
 	string profile_filename;
@@ -201,6 +201,7 @@ public class Connection : Object, Telepathy.Connection, Telepathy.ConnectionRequ
 			return {"org.freedesktop.Telepathy.Connection.Interface.Aliasing",
 					"org.freedesktop.Telepathy.Connection.Interface.ContactList",
 					"org.freedesktop.Telepathy.Connection.Interface.SimplePresence",
+					"org.freedesktop.Telepathy.Channel.Type.FileTransfer",
 					};
 		}
 	}
@@ -283,6 +284,25 @@ public class Connection : Object, Telepathy.Connection, Telepathy.ConnectionRequ
 		return chan;
 	}
 
+	async FileTransferChannel create_file_transfer_channel (uint32 friend_number, bool requested = true) /*requires (!(friend_number in chans))*/ {
+		var chan = new FileTransferChannel (tox, friend_number, requested);
+
+		yield chan.register (dbusconn, objpath);
+
+		ulong handler_id = 0;
+		handler_id = chan.closed.connect (() => {
+			chan.disconnect (handler_id);
+		});
+
+		/* Need to announce it after returning */
+		Idle.add (() => {
+			new_channels ({ChannelDetails (chan.objpath, chan.get_properties ()) });
+			return false;
+		});
+
+		return chan;
+	}
+
 	public void create_channel (HashTable<string, Variant> request,
 								out ObjectPath channel,
 								out HashTable<string, Variant> properties) throws IOError {
@@ -302,6 +322,7 @@ public class Connection : Object, Telepathy.Connection, Telepathy.ConnectionRequ
 			print("%s -> %s\n", k, v.print(true));
 		});
 
+		const string PROP_CHANNEL_TYPE = "org.freedesktop.Telepathy.Channel.ChannelType";
 		const string PROP_TARGET_HANDLE = "org.freedesktop.Telepathy.Channel.TargetHandle";
 		const string PROP_TARGET_ID = "org.freedesktop.Telepathy.Channel.TargetID";
 
@@ -311,21 +332,33 @@ public class Connection : Object, Telepathy.Connection, Telepathy.ConnectionRequ
 		else
 			friend_number = tox.friend_by_public_key(hex_string_to_bin((string) request[PROP_TARGET_ID]), null);
 
-		TextChannel chan;
-		if (friend_number in chans) {
-			chan = chans[friend_number];
-			yours = false;
-		} else {
-			chan = yield create_text_channel (friend_number);
+		var type = (string) request[PROP_CHANNEL_TYPE];
+		if (type == "org.freedesktop.Telepathy.Channel.Type.Text") {
+			TextChannel chan;
+			if (friend_number in chans) {
+				chan = chans[friend_number];
+				yours = false;
+			} else {
+				chan = yield create_text_channel (friend_number);
+				yours = true;
+			}
+			var objpath = chan.objpath;
+			var props = chan.get_properties ();
 			yours = true;
+			channel = objpath;
+			properties = props;
+		} else if (type == "org.freedesktop.Telepathy.Channel.Type.FileTransfer") {
+			FileTransferChannel chan;
+			chan = yield create_file_transfer_channel (friend_number);
+			yours = true;
+			var objpath = chan.objpath;
+			var props = chan.get_properties ();
+			channel = objpath;
+			properties = props;
+		} else {
+			print("WARNING: Invalid channel type %s requested\n", type);
 		}
 
-		var objpath = chan.objpath;
-		var props = chan.get_properties ();
-
-		yours = true;
-		channel = objpath;
-		properties = props;
 	}
 
 	public RequestableChannel[] requestable_channel_classes {
@@ -609,6 +642,15 @@ public class Connection : Object, Telepathy.Connection, Telepathy.ConnectionRequ
 			res[id] = get_presence (id);
 		}
 		return res;
+	}
+
+	public HashTable<uint, Variant> get_contact_capabilities (uint[] handles) {
+		HashTable<uint, Variant> map = new HashTable<uint, Variant> (direct_hash, direct_equal);
+		foreach(uint handle in handles) {
+			map.insert(handle, cm.proto.requestable_channel_classes);
+			print("Reporting capabilities for %ud\n", handle);
+		}
+		return map;
 	}
 
 	void friend_status_callback (Tox tox, uint32 friend_number, Tox.UserStatus status) {
